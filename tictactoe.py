@@ -4,6 +4,32 @@ The states where we lost have probability of zero and rest of them have a probab
 The formula we use is V(s[n]) = V(s[n]) + alpha * (V(s[n+2]) - V(s[n]))"""
 import random as rnd;
 import json;
+from gi.repository import Gtk;
+
+
+class ext_button(Gtk.Button):
+  
+  def __init__(self, bid):
+    Gtk.Button.__init__(self);
+    self.bid = bid;
+    self.player = 3;
+        
+
+  def set_bid(self, bid):
+   self.bid = bid;
+
+  def set_player(self, player):
+    self.player = player;
+
+  def get_player(self):
+    return self.player;
+
+  def get_bid(self):
+    return self.bid;
+
+
+
+
 def eval_game(board):
   hor_list = [0, 3, 6];
   if ((board[0] == board[4]) and (board[4] == board[8]) and (board[0] != 2)):
@@ -26,11 +52,11 @@ def eval_game(board):
 
 def print_board(board):
   pass;
-  #print "";
-  #print "======================";
-  #print "|| ", board[0], " || ", board[1], " || ", board[2]; 
-  #print "|| ", board[3], " || ", board[4], " || ", board[5]; 
-  #print "|| ", board[6], " || ", board[7], " || ", board[8]; 
+  print "";
+  print "======================";
+  print "|| ", board[0], " || ", board[1], " || ", board[2]; 
+  print "|| ", board[3], " || ", board[4], " || ", board[5]; 
+  print "|| ", board[6], " || ", board[7], " || ", board[8]; 
 
 
 def init_board():
@@ -49,6 +75,7 @@ class player():
     self.prev_state = self.decode_board([2,2,2,2,2,2,2,2,2]);
     self.state_space[self.prev_state] = 0.5;
     self.prev_stateval = 0;
+    self.gtkfinalpos = -1;
   
 
   def decode_board(self, board):
@@ -125,9 +152,8 @@ class player():
           if (rnd.random() > 0.5):
             final_pos = pos; # idea is to switch to one of the states randomly when both the states have equal reward
       board[pos] = 2;
+    self.gtkfinalpos = final_pos;
     board[final_pos] = self.player_id;  
-    ##print "FINAL POS";
-    #print_board(board);
 
   def update_state_space(self, board):
     #print "updating state space for player", self.player_id;
@@ -149,14 +175,14 @@ class player():
   def update_state_with_zero(self, board):
     board_val = self.decode_board(board);
     #print "updating with 0 ", self.player_id;
-    print_board(board);
+    #print_board(board);
     self.state_space[board_val] = 0;
     self.update_state_space(board);
   
   def update_state_with_one(self, board):
     board_val = self.decode_board(board);
     #print "updating with 1 ", self.player_id;
-    print_board(board);
+    #print_board(board);
     self.state_space[board_val] = 1;
     self.update_state_space(board);
 
@@ -183,7 +209,7 @@ init_board = board;
 count = 0;
 pl0 = player(0);
 pl1 = player(1);
-for game_idx in range(100000):
+for game_idx in range(10000):
   board = [2, 2, 2, 2, 2, 2, 2, 2, 2];
   count = 0;
   if (game_idx == 50000):
@@ -225,18 +251,94 @@ pl0.store_to_json();
 
 #print "single player mode"
 
-board = [2, 2, 2, 2, 2, 2, 2, 2, 2];
-count = 0;
-print_board(board);
-while (eval_game(board) == 2 and count < 9):
-  if (count % 2 == 0):
-    pl0.exploit(board);
-  else:
-    ip = raw_input("turn");
-    board[int(ip)] = 1;
-  print_board(board);
-  count = count + 1;
+#board = [2, 2, 2, 2, 2, 2, 2, 2, 2];
+#count = 0;
+#print_board(board);
+#while (eval_game(board) == 2 and count < 9):
+#  if (count % 2 == 0):
+#    pl0.exploit(board);
+#  else:
+#    ip = raw_input("turn");
+#    board[int(ip)] = 1;
+#  print_board(board);
+#  count = count + 1;
    
+class ourwindow(Gtk.Window):
+
+  def __init__(self):
+    print "in init";
+    Gtk.Window.__init__(self, title="Hello World");
+    Gtk.Window.set_default_size(self, 400, 325);
+    Gtk.Window.set_position(self, Gtk.WindowPosition.CENTER);
+    self.board = [2,2,2,2,2,2,2,2,2];
+
+    grid = Gtk.Grid();
+    grid.set_row_spacing(5);
+    grid.set_column_spacing(5);
+
+    self.button_list = [];
+    for row_count in range(0,3):
+        for col_count in range(0,3):
+          frm = Gtk.Frame();
+          bid = col_count + (3 * row_count);
+          self.button_list.append(ext_button(bid));
+          self.button_list[bid].set_size_request(25, 25);
+          self.button_list[bid].connect("clicked", self.button_clk);
+          frm.add(self.button_list[bid]);
+          grid.attach(frm, col_count, row_count, 1, 1);
+    self.add(grid);
+    pl0.exploit(self.board);
+    self.board[pl0.gtkfinalpos] = 0;
+    self.button_list[pl0.gtkfinalpos].set_label("0");
+
+
+  def button_clk(self, button):
+    print "entered button click";
+    print button.get_bid();
+    if (button.get_label() == None or (button.get_label() == "")):
+      button.set_label("1");
+    elif (button.get_label() == "1" or (button.get_label() == "0")):
+      return;
+    self.board[button.get_bid()] = 1;
+
+    if (eval_game(self.board) == 1):
+      pl0.update_state_with_zero(self.board);
+      print "player 1 won";
+      print_board(self.board);
+      self.reinit_window();
+      print "++++++++++++++";
+      return;
+    if (2 not in self.board):
+      self.reinit_window();
+      return;
+
+    pl0.exploit(self.board);
+    self.board[pl0.gtkfinalpos] = 0;
+    self.button_list[pl0.gtkfinalpos].set_label("0");
+    if(eval_game(self.board) == 0):
+      pl0.update_state_with_zero(self.board);
+      print "player 0 won";
+      print_board(self.board);
+      self.reinit_window();
+      print "++++++++++++++";
+    if (2 not in self.board):
+      self.reinit_window();
+      return;
+
+
+  def reinit_window(self):
+    self.board = [2,2,2,2,2,2,2,2,2];
+    for i in range(9):
+      self.button_list[i].set_label("");
+
+
+window = ourwindow();
+window.connect("delete-event", Gtk.main_quit);
+window.show_all();
+Gtk.main()
+
+
+
 #while (eval_game(board) == 2 and count < 9):
 #  if (len(tiles) > 1):
 #    rv = rnd.randint(0,len(tiles) - 1);
